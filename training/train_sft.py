@@ -22,7 +22,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 def train():
-    
     """
     This function trainss the model using SFT with the Countdown dataset.
     Uses a custom PyTorch training loop with mixed precision.
