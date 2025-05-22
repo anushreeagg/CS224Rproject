@@ -9,22 +9,22 @@ def load_model_and_tokenizer():
     Returns:
         tuple: (model, tokenizer, lora_config)
     """
-    # Load tokenizer
+    #load tokenizer
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-0.5B")
     
-    # Load model
+    #loqd model
     model = AutoModelForCausalLM.from_pretrained(
         "Qwen/Qwen1.5-0.5B",
         torch_dtype=torch.bfloat16,
         device_map="auto"
     )
     
-    # Set pad token to eos token if pad token is not set
+    #set pad token to eos token if pad token is not set
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
         model.config.pad_token_id = model.config.eos_token_id
     
-    # LoRA configuration
+    #LoRA configuration
     lora_config = LoraConfig(
         r=8,
         lora_alpha=32,
@@ -37,17 +37,16 @@ def load_model_and_tokenizer():
         ],
         bias="none",
     )
-    
-    # Apply LoRA
+    #applyig LoRA
     model = get_peft_model(model, lora_config)
     
-    # Print trainable parameters
+    
     model.print_trainable_parameters()
     
     return model, tokenizer, lora_config
 
 if __name__ == "__main__":
-    # Test the model loading
+
     model, tokenizer, _ = load_model_and_tokenizer()
     print(f"Model loaded: {model.__class__.__name__}")
     print(f"Tokenizer loaded: {tokenizer.__class__.__name__}")

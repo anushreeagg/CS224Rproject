@@ -28,7 +28,6 @@ def train():
     """
     #load model and tokenizer
     model, tokenizer, _ = load_model_and_tokenizer()
-    
     #move model to GPU (for saif's training)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)

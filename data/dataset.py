@@ -19,7 +19,6 @@ class CountdownDataset(Dataset):
         self.tokenizer = tokenizer
         self.max_input_length = max_input_length
         self.max_output_length = max_output_length
-        
         #MMLU Countdown dataset
         self.dataset = load_dataset("cais/mmlu_countdown", split=split)
         

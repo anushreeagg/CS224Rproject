@@ -76,7 +76,6 @@ The training script uses a custom PyTorch loop to fine-tune the model. It includ
 - Optional validation at the end of each epoch
 - Checkpoint saving of the final model
 
-
 #Evaluation:
 The evaluation script generates responses to prompts from the test set and compares them with ground truth responses.
 

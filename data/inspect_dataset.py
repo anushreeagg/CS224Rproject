@@ -12,8 +12,6 @@ def main():
     
 
     print(f"Dataset keys: {list(dataset[0].keys())}")
-    
-
     if len(dataset) > 100:
         sample_indices = random.sample(range(len(dataset)), 100)
     else:
