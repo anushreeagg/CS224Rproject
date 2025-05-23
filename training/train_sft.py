@@ -31,7 +31,13 @@ def train():
     #move model to GPU (for saif's training)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
-    
+    #use torch.compile for speedup
+    try:
+        model = torch.compile(model)
+        logger.info("Successfully applied torch.compile for speedup")
+    except Exception as e:
+        logger.warning(f"Could not apply torch.compile:{e}")
+
     #create datasets + dataloaders
     train_dataset = CountdownDataset(tokenizer, split="train")
     train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
@@ -48,8 +54,12 @@ def train():
     
     #number of epochs
     num_epochs = 3
+
+    #number of steps before saving
+    save_steps = 200
     
-    #saving directory
+    #saving directory for final model + checkpoints
+    os.makedirs("./checkpoints", exist_ok=True)
     os.makedirs("./final_model", exist_ok=True)
     
     #the training loop
@@ -86,11 +96,25 @@ def train():
             #Update metrics
             epoch_loss += loss.item()
             
-            #ogging
+            #logging
             global_step += 1
             if global_step % 10 == 0:
                 logger.info(f"Step {global_step} | Loss: {loss.item():.4f}")
-            
+
+            #saving checkpoint
+            if global_step % save_steps == 0:
+                checkpoint_dir = f"./checkpoints/step_{global_step}"
+                os.makedirs(checkpoint_dir, exist_ok=True)
+                model.save_pretrained(checkpoint_dir)
+                tokenizer.save_pretrained(checkpoint_dir)
+                torch.save({
+                    'epoch':epoch,
+                    'global_step':global_step,
+                    'model_state_dict':model.state_dict(),
+                    'optimizer_state_dict':optimizer.state_dict(),
+                    'scaler_state_dict':scaler.state_dict(),
+                    'lora_config':getattr(model, "peft_config", None)
+                }, f"{checkpoint_dir}/training_state.pt")
             
             progress_bar.set_postfix({"loss": loss.item()})
         
@@ -124,7 +148,11 @@ def train():
     
 
     logger.info("Saving model...")
-    model.save_pretrained("./final_model")
+    #in case there are issues with saving the compiled model
+    if hasattr(model, "save_pretrained"):
+        model.save_pretrained("./final_model")
+    else:
+        model._orig_mod.save_pretrained("./final_model")
     tokenizer.save_pretrained("./final_model")
     
     logger.info("Training completed successfully!")
