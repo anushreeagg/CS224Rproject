@@ -30,7 +30,7 @@ class CountdownDataset(Dataset):
         
         #input tokenization
         input_tokens = self.tokenizer(
-            example["input"],
+            example["query"],
             truncation=True,
             max_length=self.max_input_length,
             padding="max_length",
@@ -39,7 +39,7 @@ class CountdownDataset(Dataset):
         
         #tokenize target/output
         target_tokens = self.tokenizer(
-            example["target"],
+            example["completion"],
             truncation=True,
             max_length=self.max_output_length,
             padding="max_length",

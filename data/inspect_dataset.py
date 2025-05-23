@@ -8,7 +8,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-0.5B")
     
 
-    dataset = load_dataset("cais/mmlu_countdown", split="train")
+    dataset = load_dataset("Asap7772/cog_behav_all_strategies", split="train")
     
 
     print(f"Dataset keys: {list(dataset[0].keys())}")
@@ -24,8 +24,8 @@ def main():
         example = dataset[idx]
         
 
-        input_tokens = tokenizer(example["input"], return_length=True)
-        output_tokens = tokenizer(example["target"], return_length=True)
+        input_tokens = tokenizer(example["query"], return_length=True)
+        output_tokens = tokenizer(example["completion"], return_length=True)
         
         input_lengths.append(input_tokens["length"])
         output_lengths.append(output_tokens["length"])
@@ -46,8 +46,8 @@ def main():
 
     print("\nSample example:")
     sample_idx = sample_indices[0]
-    print(f"Input: {dataset[sample_idx]['input'][:100]}...")
-    print(f"Target: {dataset[sample_idx]['target'][:100]}...")
+    print(f"Input: {dataset[sample_idx]['query'][:100]}...")
+    print(f"Target: {dataset[sample_idx]['completion'][:100]}...")
 
 if __name__ == "__main__":
     main() 
