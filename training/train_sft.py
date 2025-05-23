@@ -43,7 +43,7 @@ def train():
     train_dataloader = DataLoader(train_dataset, batch_size=4, shuffle=True)
     
     #validation dataset
-    eval_dataset = CountdownDataset(tokenizer, split="validation")
+    eval_dataset = CountdownDataset(tokenizer, split="test")
     eval_dataloader = DataLoader(eval_dataset, batch_size=4)
     
     #optimizer
