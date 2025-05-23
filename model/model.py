@@ -10,11 +10,11 @@ def load_model_and_tokenizer():
         tuple: (model, tokenizer, lora_config)
     """
     #load tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-0.5B")
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B")
     
     #loqd model
     model = AutoModelForCausalLM.from_pretrained(
-        "Qwen/Qwen1.5-0.5B",
+        "Qwen/Qwen2.5-0.5B",
         torch_dtype=torch.bfloat16,
         device_map="auto"
     )

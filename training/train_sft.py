@@ -53,7 +53,7 @@ def train():
     scaler = torch.cuda.amp.GradScaler()
     
     #number of epochs
-    num_epochs = 3
+    num_epochs = 7
 
     #number of steps before saving
     save_steps = 200
