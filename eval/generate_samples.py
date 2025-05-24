@@ -10,7 +10,7 @@ from peft import PeftModel
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def generate_samples(model_path, num_samples=5, max_new_tokens=100):
+def generate_samples(model_path, num_samples=5, max_new_tokens=1500):
     """
     Generate sample outputs from the fine-tuned model.
     
@@ -20,11 +20,11 @@ def generate_samples(model_path, num_samples=5, max_new_tokens=100):
         max_new_tokens: Maximum number of new tokens to generate
     """
     #load base model and tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen1.5-0.5B")
+    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B")
     base_model = AutoModelForCausalLM.from_pretrained(
-        "Qwen/Qwen1.5-0.5B",
-        torch_dtype=torch.bfloat16,
-        device_map="auto"
+        "Qwen/Qwen2.5-0.5B",
+        torch_dtype=torch.float32,
+        device_map=None
     )
     
     #fine-tuned model weights
@@ -32,7 +32,8 @@ def generate_samples(model_path, num_samples=5, max_new_tokens=100):
     model.eval()
     
     #test data
-    test_dataset = load_dataset("cais/mmlu_countdown", split="test")
+    #test_dataset = load_dataset("cais/mmlu_countdown", split="test")
+    test_dataset = load_dataset("Asap7772/cog_behav_all_strategies", split="test")
     
     #random samples
     if len(test_dataset) > num_samples:
@@ -48,7 +49,7 @@ def generate_samples(model_path, num_samples=5, max_new_tokens=100):
     
     for idx in sample_indices:
         example = test_dataset[idx]
-        input_text = example["input"]
+        input_text = example["query"]
         
         #input print:
         print(f"\n\n{'='*50}")
@@ -72,7 +73,7 @@ def generate_samples(model_path, num_samples=5, max_new_tokens=100):
         print(f"\nGENERATED OUTPUT:\n{generated_text}")
         
 
-        ground_truth = example['target']
+        ground_truth = example['completion']
         print(f"\nGROUND TRUTH:\n{ground_truth}")
         
 
@@ -90,12 +91,12 @@ def generate_samples(model_path, num_samples=5, max_new_tokens=100):
 
 if __name__ == "__main__":
   
-    model_path = "../final_model" #saif you'd prolly need to change this to finetuned model path
+    model_path = "./training/final_model_v2" ##saif you'd prolly need to change this to finetuned model path
     
     # Check if model path exists
     if not os.path.exists(model_path):
         print(f"Model path '{model_path}' does not exist. Please provide a valid path.")
         print("Using default model for demonstration purposes.")
-        model_path = "Qwen/Qwen1.5-0.5B"  
+        model_path = "Qwen/Qwen2.5-0.5B"  
     
     generate_samples(model_path) 
