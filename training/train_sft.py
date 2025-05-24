@@ -6,6 +6,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import logging
+import json
 
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -57,6 +58,10 @@ def train():
 
     #number of steps before saving
     save_steps = 200
+
+    #saving training and validation losses
+    training_losses = []
+    validation_losses = []
     
     #saving directory for final model + checkpoints
     os.makedirs("./checkpoints", exist_ok=True)
@@ -100,6 +105,7 @@ def train():
             global_step += 1
             if global_step % 10 == 0:
                 logger.info(f"Step {global_step} | Loss: {loss.item():.4f}")
+                training_losses.append((global_step, loss.item()))
 
             #saving checkpoint
             if global_step % save_steps == 0:
@@ -145,7 +151,15 @@ def train():
             
             avg_eval_loss = eval_loss / len(eval_dataloader)
             logger.info(f"Validation loss: {avg_eval_loss:.4f}")
+            validation_losses.append((epoch + 1, avg_eval_loss))
     
+    logger.info("Saving training and validation losses")
+    with open("training_losses.json", "w") as f:
+        json.dump(training_losses, f)
+    
+    with open("validation_losses.json", "w") as f:
+        json.dump(validation_losses, f)
+
 
     logger.info("Saving model...")
     #in case there are issues with saving the compiled model
