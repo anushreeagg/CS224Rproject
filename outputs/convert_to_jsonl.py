@@ -3,7 +3,7 @@ import json
 
 #### LOADS OUR OUTPUT FROM generate_samples.py
 #### Note: Run from outputs directory
-with open("generations.json") as f:  
+with open("countdown_generations.json") as f:  # Changed filename
     output = json.load(f)
 
 def extract_numbers_from_prompt(prompt_text):
@@ -15,6 +15,7 @@ def extract_numbers_from_prompt(prompt_text):
     return []
 
 submission_data = []
+
 for generation in output:
     ### GET THE TARGET ANSWER
     prompt = generation['prompt']
@@ -31,6 +32,8 @@ for generation in output:
     
     if real:
         answer = answers[-1].strip()
+        # Replace / with \/ for submission format
+        answer = answer.replace('/', r'\/')
     else:
         answer = "No answer found"
     
