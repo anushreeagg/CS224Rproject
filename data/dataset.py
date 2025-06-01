@@ -65,7 +65,7 @@ class CountdownDataset(Dataset):
         ])
         
         #replace the padding tokens in labels with -100
-        labels = torch.where(attention_mask == 1, labels, torch.tensor(-100))
+        #labels = torch.where(attention_mask == 1, labels, torch.tensor(-100))
         
         return {
             "input_ids": input_ids,
