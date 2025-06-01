@@ -31,9 +31,8 @@ def load_model_and_tokenizer():
         lora_dropout=0.1,
         task_type=TaskType.CAUSAL_LM,
         target_modules=[
-            "c_attn",
-            "q_proj",
-            "v_proj"
+            "q_proj", "k_proj", "v_proj", "o_proj", 
+            "gate_proj", "up_proj", "down_proj"
         ],
         bias="none",
     )
