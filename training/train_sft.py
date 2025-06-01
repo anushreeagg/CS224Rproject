@@ -165,7 +165,7 @@ def train():
             accumulation_step += 1
 
             if accumulation_step % gradient_accumuluation_steps == 0:
-                scaler.unscale(optimizer)
+                scaler.unscale_(optimizer)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm)
                 scaler.step(optimizer)
                 scaler.update()
