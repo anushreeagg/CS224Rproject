@@ -46,7 +46,7 @@ def generate_samples(model_path, max_new_tokens=1500):
     base_model = AutoModelForCausalLM.from_pretrained(
         "Qwen/Qwen2.5-0.5B",
         torch_dtype=torch.float32,
-        device_map=None
+        device_map="auto"
     )
     
     #fine-tuned model weights
