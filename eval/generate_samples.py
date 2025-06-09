@@ -32,7 +32,7 @@ def transform_countdown(json_file_path):
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def generate_samples(model_path, max_new_tokens=1500):
+def generate_samples(model_path, max_new_tokens=1028, k=None, save=True, dataset="default", model=None):
     """
     Generate sample outputs from the fine-tuned model.
     
@@ -41,36 +41,38 @@ def generate_samples(model_path, max_new_tokens=1500):
         num_samples: Number of samples to generate
         max_new_tokens: Maximum number of new tokens to generate
     """
-    #load base model and tokenizer
-    tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B")
-    base_model = AutoModelForCausalLM.from_pretrained(
-        "Qwen/Qwen2.5-0.5B",
-        torch_dtype=torch.float32,
-        device_map="auto"
-    )
-    
-    #fine-tuned model weights
-    model = PeftModel.from_pretrained(base_model, model_path)
+    # If no model arg is passed, use the path retrieve it 
+    if not model: 
+        #load base model and tokenizer
+        tokenizer = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-0.5B")
+        base_model = AutoModelForCausalLM.from_pretrained(
+            "Qwen/Qwen2.5-0.5B",
+            torch_dtype=torch.float16,
+            device_map="auto"
+        )
+        
+        #fine-tuned model weights
+        model = PeftModel.from_pretrained(base_model, model_path)
     model.eval()
     
     #test data
-    #test_dataset = load_dataset("cais/mmlu_countdown", split="test")
-    test_dataset = transform_countdown("data/countdown.json")
-    #("Asap7772/cog_behav_all_strategies", split="test")
-    
-    #random samples
-    #if len(test_dataset) > num_samples:
-        #sample_indices = random.sample(range(len(test_dataset)), num_samples)
-    #else:
-        #sample_indices = range(len(test_dataset))
-    
+    if dataset == "default":
+        test_dataset = transform_countdown("data/countdown.json")
+    else:
+        test_dataset = dataset
+
+    #if specify a number of samples
+    if k: 
+        sample_indices = random.sample(range(len(test_dataset)), k)
+    else:
+        sample_indices = range(len(test_dataset))
     
     os.makedirs("outputs", exist_ok=True)
     
 
     generation_results = []
     
-    for idx in range(len(test_dataset)):
+    for idx in sample_indices:
         example = test_dataset[idx]
         input_text = example["query"]
         
@@ -108,8 +110,11 @@ def generate_samples(model_path, max_new_tokens=1500):
         })
     
     #Save results to JSON
-    with open("outputs/countdown_generations.json", "w") as f:
-        json.dump(generation_results, f, indent=2)
+    if save:
+        with open("outputs/countdown_generations.json", "w") as f:
+            json.dump(generation_results, f, indent=2)
+    else:
+        return generation_results
     
     #print(f"\nGeneration results saved to outputs/generations.json")
 
@@ -123,4 +128,4 @@ if __name__ == "__main__":
         print("Using default model for demonstration purposes.")
         model_path = "Qwen/Qwen2.5-0.5B"  
     
-    generate_samples(model_path) 
+    generate_samples(model_path, dataset="default") 
