@@ -4,6 +4,7 @@ import re
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset, load_dataset
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from tqdm import tqdm
 import logging
@@ -24,29 +25,59 @@ def extract_numbers_and_target(prompt_text):
     target = int(re.search(r'equals (\d+)', prompt_text).group(1))
     return numbers, target
 
-def compute_logprob(model, tokenizer, prompt, completion):
+def compute_logprob(model, tokenizer, prompts, completions):
     """
-    Compute log prob of completion given prompt.
+    Compute log prob of completion given prompts in batches.
     """
-    full_text = prompt + completion
-    inputs = tokenizer(full_text, return_tensors="pt", padding=True, truncation=True).to(device)
-    input_ids = inputs.input_ids
-    labels = input_ids.clone()
+    batch_log_probs = []
+    for prompt, completion in zip(prompts, completions):
 
-    prompt_inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to(device)
-    prompt_len = prompt_inputs.input_ids.shape[1]
-    
-    labels[:, :prompt_len] = -100
+        full_text = prompt + completion
+        inputs = tokenizer(full_text, return_tensors="pt", padding=True, truncation=True).to(device)
+        input_ids = inputs.input_ids
+        labels = input_ids.clone()
+
+        prompt_inputs = tokenizer(prompt, return_tensors="pt", padding=True, truncation=True).to(device)
+        prompt_len = prompt_inputs.input_ids.shape[1]
+        
+        labels[:, :prompt_len] = -100
+
+        with torch.no_grad():
+            outputs = model(**inputs)
+            log_probs = F.log_softmax(outputs.logits, dim=-1)
+
+        token_log_probs = log_probs[:, :-1].gather(2, labels[:, 1:].unsqueeze(-1)).squeeze(-1)
+        mask = labels[:, 1:] != -100
+        if mask.sum() == 0:
+            batch_log_probs.append(torch.tensor(0.0, device=device))
+        else:
+            batch_log_probs.append(token_log_probs[mask].sum())
+
+    return torch.stack(batch_log_probs)
+
+def generate_completions_batch(model, tokenizer, prompt, k=4, max_new_tokens=1024):
+    """
+    Generate k completions using batch generation
+    """
+    input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
+    batch_input_ids = input_ids.repeat(k, 1)
 
     with torch.no_grad():
-        outputs = model(**inputs)
-        log_probs = F.log_softmax(outputs.logits, dim=-1)
+        outputs = model.generate(
+                        input_ids=batch_input_ids,
+                        max_new_tokens=max_new_tokens,
+                        temperature=0.7,
+                        top_p=0.9,
+                        do_sample=True,
+                        pad_token_id=tokenizer.pad_token_id,
+                        num_return_sequences=1
+                    )
+        completions = []
+        for i in range(k):
+            completion = tokenizer.decode(outputs[i][input_ids.shape[1]:], skip_special_tokens=True).strip()
+            completions.append(completion)
 
-    token_log_probs = log_probs[:, :-1].gather(2, labels[:, 1:].unsqueeze(-1)).squeeze(-1)
-    mask = labels[:, 1:] != -100
-    if mask.sum() == 0:
-        return torch.tensor(0.0, device=device)
-    return token_log_probs[mask].sum()
+    return completions
 
 def format_countdown_prompt(dataset):
     """
@@ -80,7 +111,7 @@ def train_rloo(sft_model_path, data, max_new_tokens=1024):
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
-    base_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-0.5B", torch_dtype=torch.float16, device_map="auto")
+    base_model = AutoModelForCausalLM.from_pretrained("Qwen/Qwen2.5-0.5B", torch_dtype=torch.float32, device_map="auto")
        
     model = PeftModel.from_pretrained(base_model, sft_model_path)
     model.to(device)
@@ -88,30 +119,19 @@ def train_rloo(sft_model_path, data, max_new_tokens=1024):
 
     num_epochs = 3
     k = 4
+    gradient_accumulation_steps = 4
     optimizer = torch.optim.AdamW(model.parameters(), lr=1e-5)
+
+    scheduler = CosineAnnealingLR(optimizer, T_max = num_epochs * len(data))
 
     for epoch in range(num_epochs):
         logger.info(f"Epoch {epoch + 1}")
         total_loss = 0.0 
+        optimizer.zero_grad()
 
-        for row in tqdm(data):
+        for step, row in enumerate(tqdm(data, desc=f"Epoch {epoch+1}")):
             prompt = row["query"]
-            completions = []
-
-            input_ids = tokenizer(prompt, return_tensors="pt").input_ids.to(device)
-
-            for _ in range(k):
-                with torch.no_grad():
-                    output = model.generate(
-                        input_ids=input_ids,
-                        max_new_tokens=max_new_tokens,
-                        temperature=0.7,
-                        top_p=0.9,
-                        do_sample=True,
-                        pad_token_id=tokenizer.pad_token_id
-                    )
-                completion = tokenizer.decode(output[0][input_ids.shape[1]:], skip_special_tokens=True).strip()
-                completions.append(completion)
+            completions = generate_completions_batch(model, tokenizer, prompt, k, max_new_tokens)
 
             rewards = []
             for completion in completions:
@@ -122,32 +142,38 @@ def train_rloo(sft_model_path, data, max_new_tokens=1024):
                 reward = compute_score(completion, ground_truth)
                 rewards.append(reward)
 
+            rewards = torch.tensor(rewards, device=device, dtype=torch.float16)
 
-            optimizer.zero_grad()
+            if rewards.std() > 1e-6:
+                rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-8)
+
+            prompts = [prompt] * k
+            log_probs = compute_logprob(model, tokenizer, prompts, completions)
+
             batch_loss = 0.0
-
             for i in range(k):
-                baseline = (sum(rewards) - rewards[i]) / (k - 1)
+                baseline = (rewards.sum() - rewards[i]) / (k - 1)
                 advantage = rewards[i] - baseline
 
-                log_prob = compute_logprob(model, tokenizer, prompt, completions[i])
-
-                loss = -advantage * log_prob
+                loss = -advantage * log_probs[i]
                 batch_loss += loss
             
+            batch_loss = batch_loss / gradient_accumulation_steps
             batch_loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
-            optimizer.step()
-            total_loss += batch_loss.item()
+            
+            if (step + 1) % gradient_accumulation_steps == 0:
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+                optimizer.step()
+                scheduler.step()
+                optimizer.zero_grad()
+
+            total_loss += batch_loss.item() * gradient_accumulation_steps
 
         avg_loss = total_loss / len(data)
         logger.info(f"End of epoch {epoch + 1}, Average Loss: {avg_loss:.4f}")
 
     model.save_pretrained("./rloo_model")
     tokenizer.save_pretrained("./rloo_model")
-
-
-
 
 if __name__ == "__main__":
     # Load the data and the final sft model, then run the RLOO training script 
