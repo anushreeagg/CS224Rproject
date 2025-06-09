@@ -11,7 +11,6 @@ from collections import Counter
 
 
 ##### EXTENSION CODE
-
 ###### EVALUATES AN EXPRESSION FOR CORRECTNESS (used in our various test time implementation strats)
 def evaluate_expression(expression, numbers, target):
     #### Checks for expression
@@ -40,7 +39,7 @@ def extract_correct_expression(text, numbers, target):
         if any(op in line for op in ['+', '-', '*', '/']):
             expr = re.sub(r'^.*?:', '', line).strip(' "\'')
             expressions.append(expr)
-    ###### RTURNS FIRST CORRECT Return first correct one, or nothing
+    ###### RTURNS FIRST CORRECT 
     for expr in expressions:
         if evaluate_expression(expr, numbers, target):
             return expr
