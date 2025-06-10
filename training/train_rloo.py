@@ -158,7 +158,7 @@ def train_rloo(sft_model_path, data, max_new_tokens=1024, subset=False, batch_si
 
     if subset:
         subset_size = int(2750)
-        train_subset = data.select(range(subset_size))
+        train_subset = data.shuffle(seed=42).select(range(subset_size))
     else:
         train_subset = data
 
@@ -193,12 +193,12 @@ def train_rloo(sft_model_path, data, max_new_tokens=1024, subset=False, batch_si
             completions_list = generate_completions_batch(model, tokenizer, prompts, k, max_new_tokens)
 
             rewards_list = []
-            for i, completion in enumerate(completions):
+            for i, completions in enumerate(completions):
                 rewards = []
                 for completion in completions:
                     ground_truth = {
-                        "target":row["target"],
-                        "numbers":row["nums"]
+                        "target":targets[i],
+                        "numbers":nums_list[i]
                     }
                     reward = compute_score(completion, ground_truth)
                     rewards.append(reward)
